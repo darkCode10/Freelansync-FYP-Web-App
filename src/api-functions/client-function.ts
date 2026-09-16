@@ -1,0 +1,118 @@
+import { supabaseClient } from "@/supabase-client";
+import type {
+    ClientDetailsForFreelancerFromBackendType,
+    ClientProfileOwnFromBackendType,
+} from "@/Types";
+import { errorMessageMaker } from "./error-message-maker";
+
+export async function getClientProfileOwnDataById(
+    clientId: string
+): Promise<ClientProfileOwnFromBackendType> {
+    const { data, error } = await supabaseClient
+        .from("clients")
+        .select("*")
+        .eq("id", clientId)
+        .single();
+    if (error) {
+        console.error(error.message);
+        throw new Error();
+    }
+
+    return data;
+}
+
+export async function updateClientProfileImage({
+    clientId,
+    file,
+}: {
+    clientId: string;
+    file: File;
+}): Promise<string> {
+    const fileName = `${Date.now()}-${file.name}`;
+    const { error: uploadError } = await supabaseClient.storage
+        .from("freelansync-media")
+        .upload(`profile-pics/${fileName}`, file, {
+            upsert: false,
+            cacheControl: "3600",
+            contentType: file.type,
+        });
+    if (uploadError) {
+        console.error(uploadError.message);
+        throw new Error(errorMessageMaker(uploadError.message));
+    }
+
+    const { data: imageData } = supabaseClient.storage
+        .from("freelansync-media")
+        .getPublicUrl(`profile-pics/${fileName}`);
+    if (!imageData.publicUrl) {
+        console.error("Error! Failed to get image public url");
+        throw new Error(
+            errorMessageMaker("Failed to upload image, Failed to get public url")
+        );
+    }
+
+    const { error: updateImageError } = await supabaseClient
+        .from("clients")
+        .update({ profile_pic: imageData.publicUrl })
+        .eq("id", clientId);
+
+    if (updateImageError) {
+        console.error(updateImageError.message);
+        throw new Error(errorMessageMaker(updateImageError.message));
+    }
+
+    return imageData.publicUrl;
+}
+
+export async function getClientDetailsForFreelancer(
+    clientId: string
+): Promise<ClientDetailsForFreelancerFromBackendType> {
+    const { data, error } = await supabaseClient
+        .from("clients")
+        .select("id, username, email, profile_pic, role, created_at")
+        .eq("id", clientId)
+        .single();
+
+    if (error) {
+        console.error(error.message);
+        throw new Error();
+    }
+
+    return data;
+}
+
+export async function getUserWalletFunds({
+    userId,
+    userRole,
+}: {
+    userId: string;
+    userRole: "client" | "freelancer";
+}): Promise<{ wallet_amount: number }> {
+    const targetTable = userRole === "client" ? "clients" : "freelancers";
+    const { data, error } = await supabaseClient
+        .from(targetTable)
+        .select("wallet_amount")
+        .eq("id", userId)
+        .single();
+    if (error) {
+        console.error(error.message);
+        throw new Error();
+    }
+    return data;
+}
+
+export async function addFundsIntoClientWallet(params: {
+    userId: string;
+    walletAmount: number;
+    addedFunds: number;
+    clientId: string;
+}) {
+    const { error } = await supabaseClient
+        .from("clients")
+        .update({ wallet_amount: params.walletAmount + params.addedFunds })
+        .eq("id", params.clientId);
+    if (error) {
+        console.error(error.message);
+        throw new Error(errorMessageMaker(error.message));
+    }
+}

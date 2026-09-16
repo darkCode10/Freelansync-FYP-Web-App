@@ -1,0 +1,54 @@
+import { getUserWalletFunds } from "@/api-functions/client-function";
+import type { UserType } from "@/Types";
+import { useQuery } from "@tanstack/react-query";
+import { Spinner } from "./ui/spinner";
+
+const DashboardUserCard = ({ user }: { user: UserType }) => {
+    const { isLoading, isError, data } = useQuery({
+        queryFn: () => getUserWalletFunds({ userId: user.id, userRole: user.role }),
+        queryKey: ["get-client-wallet-funds"],
+    });
+
+    return (
+        <div className="flex-1 rounded-2xl bg-(--my-blue) shadow-lg flex flex-col items-center text-white justify-center">
+            {/* Avatar */}
+            <div className="relative">
+                <img
+                    src={user.profile_pic}
+                    alt={user.username}
+                    className="w-[150px] h-[150px] rounded-full object-cover border-4 border-white shadow-md mt-6"
+                />
+            </div>
+
+            {/* User Info */}
+            <div className="mt-6 text-center space-y-1">
+                <h2 className="text-xl font-semibold tracking-wide">{user.username}</h2>
+                <p className="text-sm text-white/80">{user.email}</p>
+            </div>
+
+            {/* Divider */}
+            <div className="w-full h-px bg-white/20 my-5" />
+
+            {/* Wallet */}
+            <div className="flex flex-col items-center gap-1">
+                <span className="text-sm uppercase tracking-wide text-white/70">
+                    Wallet Balance
+                </span>
+
+                {isLoading && (
+                    <div>
+                        <Spinner />
+                    </div>
+                )}
+                {isError && <span>Failed to get wallet data</span>}
+                {data && (
+                    <span className="text-2xl font-bold mb-4">
+                        Rs. {data.wallet_amount.toLocaleString("en-US")}
+                    </span>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export default DashboardUserCard;
